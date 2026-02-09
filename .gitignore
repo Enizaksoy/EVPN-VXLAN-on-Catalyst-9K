@@ -1,0 +1,13 @@
+# Windows reserved names
+nul
+NUL
+con
+CON
+aux
+AUX
+prn
+PRN
+
+# OS files
+.DS_Store
+Thumbs.db
