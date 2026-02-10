@@ -11,3 +11,7 @@ PRN
 # OS files
 .DS_Store
 Thumbs.db
+
+# Scripts with credentials (do not push)
+scripts/
+temp_vxlan.xml
