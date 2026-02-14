@@ -1,0 +1,1882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OnPrem Multi-Vendor EVPN VXLAN Integration</title>
+    <style>
+        :root {
+            --bg-dark: #1a1a2e;
+            --bg-card: #16213e;
+            --bg-code: #0f0f23;
+            --accent-blue: #4fc3f7;
+            --accent-green: #66bb6a;
+            --accent-orange: #ff9800;
+            --accent-red: #ef5350;
+            --accent-purple: #ce93d8;
+            --text-primary: #e0e0e0;
+            --text-secondary: #9e9e9e;
+            --border: #2a2a4a;
+            --sidebar-width: 280px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            line-height: 1.7;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            min-width: var(--sidebar-width);
+            background: #12122a;
+            border-right: 1px solid var(--border);
+            height: 100vh;
+            overflow-y: auto;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-header {
+            padding: 20px 18px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .sidebar-header h1 {
+            font-size: 1.15em;
+            color: var(--accent-blue);
+            margin-bottom: 4px;
+        }
+        .sidebar-header .subtitle {
+            font-size: 0.72em;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        .sidebar-nav {
+            flex: 1;
+            padding: 12px 0;
+            overflow-y: auto;
+        }
+        .sidebar-nav a {
+            display: block;
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 6px 18px;
+            font-size: 0.85em;
+            border-left: 3px solid transparent;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        .sidebar-nav a:hover {
+            color: var(--text-primary);
+            background: rgba(79,195,247,0.05);
+        }
+        .sidebar-nav a.active {
+            color: var(--accent-blue);
+            border-left-color: var(--accent-blue);
+            background: rgba(79,195,247,0.08);
+            font-weight: 600;
+        }
+        .sidebar-nav a.indent {
+            padding-left: 36px;
+            font-size: 0.8em;
+        }
+        .sidebar-nav .sub-items {
+            display: none;
+            overflow: hidden;
+        }
+        .sidebar-nav .sub-items.expanded {
+            display: block;
+        }
+        .sidebar-nav .nav-section-label {
+            font-size: 0.65em;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #555;
+            padding: 14px 18px 4px;
+            font-weight: bold;
+        }
+
+        /* Content Panel */
+        .content-area {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            height: 100vh;
+            overflow-y: auto;
+            padding: 30px 40px 60px;
+        }
+        .section-panel {
+            display: none;
+            animation: fadeIn 0.25s ease;
+        }
+        .section-panel.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Hamburger for mobile */
+        .hamburger {
+            display: none;
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 200;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--accent-blue);
+            font-size: 1.5em;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 2.2em;
+            color: var(--accent-blue);
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1em;
+            margin-bottom: 30px;
+        }
+        h2 {
+            font-size: 1.5em;
+            color: var(--accent-orange);
+            border-bottom: 2px solid var(--accent-orange);
+            padding-bottom: 8px;
+            margin: 0 0 18px 0;
+        }
+        h3 {
+            font-size: 1.15em;
+            color: var(--accent-green);
+            margin: 20px 0 10px 0;
+        }
+        h4 {
+            font-size: 1em;
+            color: var(--accent-purple);
+            margin: 15px 0 8px 0;
+        }
+        p { margin: 8px 0; }
+        ul, ol { margin: 8px 0 8px 24px; }
+        li { margin-bottom: 4px; }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px 25px;
+            margin: 15px 0;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .badge-cisco { background: #1565c0; color: white; }
+        .badge-versa { background: #e65100; color: white; }
+        .badge-cumulus { background: #2e7d32; color: white; }
+        .badge-done { background: #2e7d32; color: white; }
+        .badge-fix { background: #d32f2f; color: white; }
+        .badge-info { background: #1565c0; color: white; }
+        .badge-spine { background: #1565c0; color: white; }
+        .badge-leaf { background: #2e7d32; color: white; }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 0.92em;
+        }
+        th {
+            background: #1a237e;
+            color: var(--accent-blue);
+            padding: 10px 14px;
+            text-align: left;
+            border: 1px solid var(--border);
+        }
+        td {
+            padding: 8px 14px;
+            border: 1px solid var(--border);
+        }
+        tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+        tr:hover { background: rgba(79,195,247,0.07); }
+
+        /* Code blocks */
+        pre {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 14px 18px;
+            overflow-x: auto;
+            font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+            font-size: 0.88em;
+            line-height: 1.5;
+            margin: 10px 0;
+        }
+        code {
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            background: rgba(79,195,247,0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+        }
+        .cmd { color: #81d4fa; }
+        .comment { color: #616161; font-style: italic; }
+        .highlight { color: #ffcc80; }
+        .ip { color: #a5d6a7; }
+
+        /* Alert boxes */
+        .alert-box {
+            border-radius: 8px;
+            padding: 14px 18px;
+            margin: 12px 0;
+            font-size: 0.92em;
+        }
+        .alert-warning {
+            background: rgba(255,152,0,0.12);
+            border-left: 4px solid var(--accent-orange);
+            color: #ffcc80;
+        }
+        .alert-danger {
+            background: rgba(239,83,80,0.12);
+            border-left: 4px solid var(--accent-red);
+            color: #ef9a9a;
+        }
+        .alert-info {
+            background: rgba(79,195,247,0.1);
+            border-left: 4px solid var(--accent-blue);
+            color: #b3e5fc;
+        }
+        .alert-success {
+            background: rgba(102,187,106,0.1);
+            border-left: 4px solid var(--accent-green);
+            color: #a5d6a7;
+        }
+
+        .status-ok { color: var(--accent-green); font-weight: bold; }
+        .status-fail { color: var(--accent-red); font-weight: bold; }
+
+        hr { border: none; border-top: 1px solid var(--border); margin: 30px 0; }
+
+        .topology-ascii {
+            background: var(--bg-code);
+            border: 2px solid var(--accent-orange);
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 0.82em;
+            line-height: 1.4;
+            overflow-x: auto;
+            white-space: pre;
+            color: var(--text-primary);
+        }
+
+        /* Grid layouts */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+        @media (max-width: 1100px) { .grid-3 { grid-template-columns: 1fr; } }
+        @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+
+        /* Vendor comparison columns */
+        .vendor-compare {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            margin: 12px 0;
+        }
+        .vendor-compare .vendor-col {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            overflow-x: auto;
+        }
+        .vendor-col.cisco-col { border-top: 3px solid #1565c0; }
+        .vendor-col.versa-col { border-top: 3px solid #e65100; }
+        .vendor-col.cumulus-col { border-top: 3px solid #2e7d32; }
+        .vendor-col h4 { margin-top: 0; }
+        @media (max-width: 1100px) { .vendor-compare { grid-template-columns: 1fr; } }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.85em;
+            margin-top: 40px;
+            padding: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .hamburger {
+                display: block;
+            }
+            .content-area {
+                margin-left: 0;
+                padding: 20px 16px 60px;
+                padding-top: 50px;
+            }
+        }
+
+        /* Scrollbar styling */
+        .sidebar::-webkit-scrollbar,
+        .content-area::-webkit-scrollbar {
+            width: 6px;
+        }
+        .sidebar::-webkit-scrollbar-track,
+        .content-area::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #2a2a4a;
+            border-radius: 3px;
+        }
+        .content-area::-webkit-scrollbar-thumb {
+            background: #3a3a5a;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Hamburger for mobile -->
+<button class="hamburger" onclick="toggleSidebar()">&#9776;</button>
+
+<!-- LEFT SIDEBAR -->
+<nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <h1>EVPN VXLAN Fabric</h1>
+        <div class="subtitle">Multi-Vendor Integration<br>Cisco Catalyst 9300 &bull; Versa FlexVNF &bull; Cumulus Linux<br>Version 2.0 | February 2026</div>
+    </div>
+    <div class="sidebar-nav" id="sidebar-nav">
+        <div class="nav-section-label">Documentation</div>
+        <a onclick="showSection('summary')" data-section="summary">1. Summary</a>
+        <a onclick="showSection('topology')" data-section="topology">2. Topology</a>
+        <a onclick="showSection('inventory')" data-section="inventory">3. Device Inventory</a>
+        <div class="sub-items" data-parent="inventory">
+            <a class="indent" onclick="showSection('inventory')" data-section="inventory" data-scroll="underlay-links">3.1 Underlay Links</a>
+        </div>
+        <a onclick="showSection('vlan-vni')" data-section="vlan-vni">4. VLAN / VNI Mapping</a>
+        <a onclick="showSection('underlay')" data-section="underlay">5. Underlay Config (OSPF)</a>
+        <div class="sub-items" data-parent="underlay">
+            <a class="indent" onclick="showSection('underlay')" data-section="underlay" data-scroll="underlay-sw1">5.1 sw1 Spine</a>
+            <a class="indent" onclick="showSection('underlay')" data-section="underlay" data-scroll="underlay-versa">5.2 Versa OSPF</a>
+            <a class="indent" onclick="showSection('underlay')" data-section="underlay" data-scroll="underlay-verify">5.3 OSPF Verification</a>
+        </div>
+        <a onclick="showSection('bgp-evpn')" data-section="bgp-evpn">6. BGP EVPN Overlay</a>
+        <div class="sub-items" data-parent="bgp-evpn">
+            <a class="indent" onclick="showSection('bgp-evpn')" data-section="bgp-evpn" data-scroll="bgp-rr">6.1 Route Reflector</a>
+            <a class="indent" onclick="showSection('bgp-evpn')" data-section="bgp-evpn" data-scroll="bgp-versa">6.2 Versa BGP</a>
+            <a class="indent" onclick="showSection('bgp-evpn')" data-section="bgp-evpn" data-scroll="bgp-verify">6.3 BGP Verification</a>
+        </div>
+        <a onclick="showSection('l2vpn')" data-section="l2vpn">7. L2VPN EVPN Instances</a>
+        <div class="sub-items" data-parent="l2vpn">
+            <a class="indent" onclick="showSection('l2vpn')" data-section="l2vpn" data-scroll="rt-mapping">7.1 Route Targets</a>
+            <a class="indent" onclick="showSection('l2vpn')" data-section="l2vpn" data-scroll="sw2-l2vpn">7.2 sw2 L2VPN</a>
+            <a class="indent" onclick="showSection('l2vpn')" data-section="l2vpn" data-scroll="versa-vswitch">7.3 Versa Virtual-Switch</a>
+        </div>
+        <a onclick="showSection('cumulus')" data-section="cumulus">8. Cumulus Linux Config</a>
+        <div class="sub-items" data-parent="cumulus">
+            <a class="indent" onclick="showSection('cumulus')" data-section="cumulus" data-scroll="nvue-commands">8.1 NVUE Commands</a>
+            <a class="indent" onclick="showSection('cumulus')" data-section="cumulus" data-scroll="cumulus-verify">8.2 Verification</a>
+        </div>
+        <a onclick="showSection('nve-peers')" data-section="nve-peers">9. NVE Peer Verification</a>
+        <a onclick="showSection('mac-learning')" data-section="mac-learning">10. MAC Address Learning</a>
+        <a onclick="showSection('gbp-issue')" data-section="gbp-issue">11. VXLAN-GBP Issue</a>
+        <div class="sub-items" data-parent="gbp-issue">
+            <a class="indent" onclick="showSection('gbp-issue')" data-section="gbp-issue" data-scroll="what-is-gbp">11.1 What is GBP?</a>
+            <a class="indent" onclick="showSection('gbp-issue')" data-section="gbp-issue" data-scroll="packet-capture">11.2 Packet Capture</a>
+            <a class="indent" onclick="showSection('gbp-issue')" data-section="gbp-issue" data-scroll="hex-dump">11.3 Hex Dump</a>
+            <a class="indent" onclick="showSection('gbp-issue')" data-section="gbp-issue" data-scroll="why-fails">11.4 Why it Fails</a>
+        </div>
+        <a onclick="showSection('gbp-fix')" data-section="gbp-fix">12. GBP Fix &amp; Resolution</a>
+        <div class="sub-items" data-parent="gbp-fix">
+            <a class="indent" onclick="showSection('gbp-fix')" data-section="gbp-fix" data-scroll="fix-recreate">12.1 Recreate with GBP</a>
+            <a class="indent" onclick="showSection('gbp-fix')" data-section="gbp-fix" data-scroll="fix-restore">12.2 Restore Bridge</a>
+            <a class="indent" onclick="showSection('gbp-fix')" data-section="gbp-fix" data-scroll="fix-verify">12.3 Post-Fix Verify</a>
+        </div>
+        <a onclick="showSection('cmd-ref')" data-section="cmd-ref">13. Command Reference</a>
+        <a onclick="showSection('comparison')" data-section="comparison">14. Multi-Vendor Comparison</a>
+        <div class="sub-items" data-parent="comparison">
+            <a class="indent" onclick="showSection('comparison')" data-section="comparison" data-scroll="cmp-ospf">14.1 OSPF Underlay</a>
+            <a class="indent" onclick="showSection('comparison')" data-section="comparison" data-scroll="cmp-bgp">14.2 BGP EVPN Overlay</a>
+            <a class="indent" onclick="showSection('comparison')" data-section="comparison" data-scroll="cmp-vxlan">14.3 VXLAN / L2VPN</a>
+            <a class="indent" onclick="showSection('comparison')" data-section="comparison" data-scroll="cmp-ospf-verify">14.4 OSPF Verification</a>
+            <a class="indent" onclick="showSection('comparison')" data-section="comparison" data-scroll="cmp-bgp-verify">14.5 BGP EVPN Verification</a>
+            <a class="indent" onclick="showSection('comparison')" data-section="comparison" data-scroll="cmp-nve-verify">14.6 VXLAN Tunnel / NVE</a>
+            <a class="indent" onclick="showSection('comparison')" data-section="comparison" data-scroll="cmp-mac-verify">14.7 MAC Table Verification</a>
+        </div>
+        <a onclick="showSection('lessons')" data-section="lessons">15. Lessons Learned</a>
+    </div>
+</nav>
+
+<!-- RIGHT CONTENT AREA -->
+<main class="content-area" id="content-area">
+
+<!-- ============================================================ -->
+<!-- 1. SUMMARY -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-summary">
+    <h2 id="summary">1. Summary</h2>
+    <div class="card">
+        <h1 style="font-size:1.6em; margin-bottom:2px;">OnPrem Multi-Vendor EVPN VXLAN Integration</h1>
+        <p class="subtitle" style="margin-bottom:10px;">Cisco Catalyst 9300 &bull; Versa FlexVNF &bull; Cumulus Linux (NVIDIA)</p>
+        <p style="font-size:0.85em; color:var(--text-secondary);">Version 2.0 | February 10, 2026</p>
+    </div>
+    <div class="card">
+        <p>This document covers the integration of a multi-vendor BGP EVPN VXLAN fabric for <strong>Layer 2 extension of VLAN 1151 (VNI 401151)</strong> across four leaf VTEPs. The fabric uses <strong>iBGP with a route reflector</strong>, <strong>OSPF underlay</strong>, and <strong>ingress replication</strong> for BUM traffic.</p>
+        <h3>Fabric Status</h3>
+        <table>
+            <tr><th>Component</th><th>Status</th></tr>
+            <tr><td>OSPF Adjacencies</td><td class="status-ok">FULL (all 4 peers)</td></tr>
+            <tr><td>BGP EVPN Peers</td><td class="status-ok">Established (4/4)</td></tr>
+            <tr><td>VXLAN Tunnels</td><td class="status-ok">4 VTEPs UP</td></tr>
+            <tr><td>Cross-vendor MAC Learning</td><td class="status-ok">Working</td></tr>
+            <tr><td>VXLAN-GBP (Versa to Cumulus)</td><td><span class="badge badge-fix">FIXED</span></td></tr>
+        </table>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 2. TOPOLOGY -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-topology">
+    <h2 id="topology">2. Topology</h2>
+    <div class="card">
+        <p>All four leaf VTEPs connected to <strong>sw1</strong> spine. VXLAN full-mesh tunnels overlay. Versa sends VXLAN-GBP headers.</p>
+    </div>
+    <div style="width:100%; overflow-x:auto; background:#fff; border-radius:8px; padding:10px; box-sizing:border-box; margin:15px 0;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 820" style="width:100%; height:auto; font-family:'Segoe UI',Arial,Helvetica,sans-serif;">
+            <defs>
+                <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+                    <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="#00000033"/>
+                </filter>
+                <linearGradient id="cisco-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#1976D2"/>
+                    <stop offset="100%" style="stop-color:#0D47A1"/>
+                </linearGradient>
+                <linearGradient id="versa-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#F57C00"/>
+                    <stop offset="100%" style="stop-color:#E65100"/>
+                </linearGradient>
+                <linearGradient id="cumulus-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#43A047"/>
+                    <stop offset="100%" style="stop-color:#2E7D32"/>
+                </linearGradient>
+            </defs>
+
+            <!-- Title -->
+            <text x="550" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#333">EVPN VXLAN Multi-Vendor Fabric Topology</text>
+            <text x="550" y="50" text-anchor="middle" font-size="12" fill="#666">VLAN 1151 / VNI 401151 &mdash; iBGP with Route Reflector &mdash; OSPF Underlay</text>
+
+            <!-- Overlay cloud -->
+            <ellipse cx="550" cy="310" rx="480" ry="60" fill="none" stroke="#9E9E9E" stroke-width="1.5" stroke-dasharray="8,4" opacity="0.5"/>
+            <text x="550" y="275" text-anchor="middle" font-size="11" fill="#9E9E9E" font-style="italic">VXLAN Overlay (VNI 401151) &mdash; Ingress Replication</text>
+
+            <!-- SPINE: sw1 -->
+            <rect x="430" y="80" width="240" height="90" rx="10" fill="url(#cisco-grad)" stroke="#64B5F6" stroke-width="2" filter="url(#shadow)"/>
+            <text x="550" y="105" text-anchor="middle" font-size="14" font-weight="bold" fill="#FFF">sw1 (Spine / BGP RR)</text>
+            <text x="550" y="122" text-anchor="middle" font-size="11" fill="#BBDEFB">Catalyst 9300</text>
+            <text x="550" y="138" text-anchor="middle" font-size="10" fill="#C8E6C9">Lo: 1.1.1.1 | RID: 1.1.1.1</text>
+            <text x="550" y="153" text-anchor="middle" font-size="10" fill="#90CAF9">Mgmt: 192.168.20.77 | AS 6500</text>
+            <text x="430" y="77" font-size="10" font-weight="bold" fill="#1565C0">CISCO</text>
+
+            <!-- Connection lines from sw1 to leaves -->
+            <!-- sw1 to sw2 -->
+            <line x1="475" y1="170" x2="145" y2="370" stroke="#1976D2" stroke-width="2"/>
+            <text x="280" y="265" text-anchor="middle" font-size="9" fill="#1976D2" transform="rotate(-33,280,265)">Gi1/0/1 &mdash; 12.12.12.0/30</text>
+
+            <!-- sw1 to sw3 -->
+            <line x1="510" y1="170" x2="380" y2="370" stroke="#1976D2" stroke-width="2"/>
+            <text x="430" y="280" text-anchor="middle" font-size="9" fill="#1976D2" transform="rotate(-25,430,280)">Gi1/0/2 &mdash; 12.12.12.4/30</text>
+
+            <!-- sw1 to Versa -->
+            <line x1="590" y1="170" x2="720" y2="370" stroke="#F57C00" stroke-width="2"/>
+            <text x="670" y="280" text-anchor="middle" font-size="9" fill="#F57C00" transform="rotate(25,670,280)">Gi1/0/3 &mdash; 12.12.12.8/30</text>
+
+            <!-- sw1 to Cumulus -->
+            <line x1="625" y1="170" x2="955" y2="370" stroke="#43A047" stroke-width="2"/>
+            <text x="820" y="265" text-anchor="middle" font-size="9" fill="#43A047" transform="rotate(33,820,265)">Gi1/0/4 &mdash; 12.12.12.12/30</text>
+
+            <!-- LEAF 1: sw2 -->
+            <rect x="40" y="370" width="210" height="90" rx="10" fill="url(#cisco-grad)" stroke="#64B5F6" stroke-width="2" filter="url(#shadow)"/>
+            <text x="145" y="395" text-anchor="middle" font-size="13" font-weight="bold" fill="#FFF">sw2 (Leaf VTEP)</text>
+            <text x="145" y="412" text-anchor="middle" font-size="11" fill="#BBDEFB">Catalyst 9300</text>
+            <text x="145" y="428" text-anchor="middle" font-size="10" fill="#C8E6C9">Lo: 1.1.1.2 | RID: 1.1.1.2</text>
+            <text x="145" y="443" text-anchor="middle" font-size="10" fill="#90CAF9">Mgmt: 192.168.20.76</text>
+            <text x="40" y="367" font-size="10" font-weight="bold" fill="#1565C0">CISCO</text>
+
+            <!-- LEAF 2: sw3 -->
+            <rect x="275" y="370" width="210" height="90" rx="10" fill="url(#cisco-grad)" stroke="#64B5F6" stroke-width="2" filter="url(#shadow)"/>
+            <text x="380" y="395" text-anchor="middle" font-size="13" font-weight="bold" fill="#FFF">sw3 (Leaf VTEP)</text>
+            <text x="380" y="412" text-anchor="middle" font-size="11" fill="#BBDEFB">Catalyst 9300</text>
+            <text x="380" y="428" text-anchor="middle" font-size="10" fill="#C8E6C9">Lo: 1.1.1.3 | RID: 1.1.1.3</text>
+            <text x="380" y="443" text-anchor="middle" font-size="10" fill="#90CAF9">Mgmt: 192.168.20.81</text>
+            <text x="275" y="367" font-size="10" font-weight="bold" fill="#1565C0">CISCO</text>
+
+            <!-- LEAF 3: Versa -->
+            <rect x="615" y="370" width="210" height="90" rx="10" fill="url(#versa-grad)" stroke="#FFB74D" stroke-width="2" filter="url(#shadow)"/>
+            <text x="720" y="395" text-anchor="middle" font-size="13" font-weight="bold" fill="#FFF">Versa FlexVNF</text>
+            <text x="720" y="412" text-anchor="middle" font-size="11" fill="#FFE0B2">FlexVNF 22.1.4</text>
+            <text x="720" y="428" text-anchor="middle" font-size="10" fill="#C8E6C9">VTEP: 1.1.1.4 | RID: 12.12.12.10</text>
+            <text x="720" y="443" text-anchor="middle" font-size="10" fill="#FFE0B2">Mgmt: 192.168.20.166</text>
+            <text x="615" y="367" font-size="10" font-weight="bold" fill="#E65100">VERSA</text>
+
+            <!-- LEAF 4: Cumulus -->
+            <rect x="850" y="370" width="210" height="90" rx="10" fill="url(#cumulus-grad)" stroke="#81C784" stroke-width="2" filter="url(#shadow)"/>
+            <text x="955" y="395" text-anchor="middle" font-size="13" font-weight="bold" fill="#FFF">Cumulus_Nvidia</text>
+            <text x="955" y="412" text-anchor="middle" font-size="11" fill="#C8E6C9">Cumulus Linux 5.x</text>
+            <text x="955" y="428" text-anchor="middle" font-size="10" fill="#C8E6C9">Lo: 1.1.1.5 | RID: 1.1.1.5</text>
+            <text x="955" y="443" text-anchor="middle" font-size="10" fill="#A5D6A7">Mgmt: 192.168.20.172</text>
+            <text x="850" y="367" font-size="10" font-weight="bold" fill="#2E7D32">CUMULUS</text>
+
+            <!-- VLAN 1151 bar -->
+            <rect x="40" y="500" width="1020" height="30" rx="6" fill="#E3F2FD" stroke="#1976D2" stroke-width="1.5" stroke-dasharray="6,3"/>
+            <text x="550" y="520" text-anchor="middle" font-size="12" font-weight="bold" fill="#1565C0">VLAN 1151 (VNI 401151) &mdash; 192.168.1.0/25</text>
+
+            <!-- Connections from leaves to VLAN bar -->
+            <line x1="145" y1="460" x2="145" y2="500" stroke="#1976D2" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <line x1="380" y1="460" x2="380" y2="500" stroke="#1976D2" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <line x1="720" y1="460" x2="720" y2="500" stroke="#F57C00" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <line x1="955" y1="460" x2="955" y2="500" stroke="#43A047" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+            <!-- Test clients -->
+            <line x1="145" y1="530" x2="145" y2="570" stroke="#78909C" stroke-width="1"/>
+            <rect x="85" y="570" width="120" height="50" rx="6" fill="#ECEFF1" stroke="#90A4AE" stroke-width="1"/>
+            <text x="145" y="592" text-anchor="middle" font-size="11" font-weight="bold" fill="#37474F">Test Client</text>
+            <text x="145" y="608" text-anchor="middle" font-size="9" fill="#546E7A">192.168.1.x</text>
+
+            <line x1="380" y1="530" x2="380" y2="570" stroke="#78909C" stroke-width="1"/>
+            <rect x="320" y="570" width="120" height="50" rx="6" fill="#ECEFF1" stroke="#90A4AE" stroke-width="1"/>
+            <text x="380" y="592" text-anchor="middle" font-size="11" font-weight="bold" fill="#37474F">Test Client</text>
+            <text x="380" y="608" text-anchor="middle" font-size="9" fill="#546E7A">192.168.1.x</text>
+
+            <line x1="720" y1="530" x2="720" y2="570" stroke="#78909C" stroke-width="1"/>
+            <rect x="660" y="570" width="120" height="50" rx="6" fill="#FFF3E0" stroke="#FFB74D" stroke-width="1"/>
+            <text x="720" y="592" text-anchor="middle" font-size="11" font-weight="bold" fill="#E65100">Versa Client</text>
+            <text x="720" y="608" text-anchor="middle" font-size="9" fill="#BF360C">192.168.1.10</text>
+
+            <line x1="955" y1="530" x2="955" y2="570" stroke="#78909C" stroke-width="1"/>
+            <rect x="895" y="570" width="120" height="50" rx="6" fill="#E8F5E9" stroke="#81C784" stroke-width="1"/>
+            <text x="955" y="592" text-anchor="middle" font-size="11" font-weight="bold" fill="#2E7D32">Cumulus Client</text>
+            <text x="955" y="608" text-anchor="middle" font-size="9" fill="#1B5E20">192.168.1.12</text>
+
+            <!-- VXLAN-GBP warning indicator -->
+            <line x1="780" y1="590" x2="895" y2="590" stroke="#EF5350" stroke-width="2" stroke-dasharray="6,3"/>
+            <text x="837" y="585" text-anchor="middle" font-size="9" font-weight="bold" fill="#EF5350">VXLAN-GBP</text>
+            <text x="837" y="640" text-anchor="middle" font-size="9" fill="#EF5350">(Fixed with gbp flag)</text>
+
+            <!-- Legend -->
+            <rect x="40" y="680" width="380" height="100" rx="8" fill="#FAFAFA" stroke="#E0E0E0" stroke-width="1"/>
+            <text x="60" y="702" font-size="12" font-weight="bold" fill="#333">Legend</text>
+            <rect x="60" y="712" width="14" height="14" rx="3" fill="#1976D2"/>
+            <text x="82" y="724" font-size="10" fill="#555">Cisco Catalyst 9300 (IOS-XE)</text>
+            <rect x="60" y="732" width="14" height="14" rx="3" fill="#F57C00"/>
+            <text x="82" y="744" font-size="10" fill="#555">Versa FlexVNF (SD-WAN VTEP)</text>
+            <rect x="60" y="752" width="14" height="14" rx="3" fill="#43A047"/>
+            <text x="82" y="764" font-size="10" fill="#555">Cumulus Linux / NVIDIA (NVUE)</text>
+            <line x1="260" y1="720" x2="290" y2="720" stroke="#EF5350" stroke-width="2" stroke-dasharray="6,3"/>
+            <text x="298" y="724" font-size="10" fill="#555">VXLAN-GBP Issue (Fixed)</text>
+            <line x1="260" y1="740" x2="290" y2="740" stroke="#9E9E9E" stroke-width="1.5" stroke-dasharray="8,4"/>
+            <text x="298" y="744" font-size="10" fill="#555">VXLAN Overlay Tunnel</text>
+        </svg>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 3. DEVICE INVENTORY -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-inventory">
+    <h2 id="inventory">3. Device Inventory</h2>
+    <div class="card">
+        <h3>Fabric Devices</h3>
+        <table>
+            <tr>
+                <th>Device</th><th>Role</th><th>Platform</th><th>Loopback/VTEP</th><th>OSPF RID</th><th>BGP AS</th><th>Mgmt IP</th>
+            </tr>
+            <tr>
+                <td><span class="badge badge-cisco">CISCO</span> sw1</td>
+                <td>Spine / BGP RR</td><td>Catalyst 9300</td><td>1.1.1.1</td><td>1.1.1.1</td><td>6500</td><td>192.168.20.77</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-cisco">CISCO</span> sw2</td>
+                <td>Leaf VTEP</td><td>Catalyst 9300</td><td>1.1.1.2</td><td>1.1.1.2</td><td>6500</td><td>192.168.20.76</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-cisco">CISCO</span> sw3</td>
+                <td>Leaf VTEP</td><td>Catalyst 9300</td><td>1.1.1.3</td><td>1.1.1.3</td><td>6500</td><td>192.168.20.81</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-versa">VERSA</span> FlexVNF</td>
+                <td>SD-WAN VTEP</td><td>FlexVNF 22.1.4</td><td>1.1.1.4</td><td>12.12.12.10</td><td>6500</td><td>192.168.20.166</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-cumulus">CUMULUS</span> Nvidia</td>
+                <td>Leaf VTEP</td><td>Cumulus Linux 5.x</td><td>1.1.1.5</td><td>1.1.1.5</td><td>6500</td><td>192.168.20.172</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="card" id="underlay-links">
+        <h3>3.1 Underlay Point-to-Point Links</h3>
+        <table>
+            <tr>
+                <th>Link</th><th>sw1 Intf</th><th>sw1 IP</th><th>Remote Intf</th><th>Remote IP</th><th>Subnet</th>
+            </tr>
+            <tr><td>sw1 &harr; sw2</td><td>Gi1/0/1</td><td>12.12.12.1</td><td>Gi1/0/1</td><td>12.12.12.2</td><td>12.12.12.0/30</td></tr>
+            <tr><td>sw1 &harr; sw3</td><td>Gi1/0/2</td><td>12.12.12.5</td><td>Gi1/0/1</td><td>12.12.12.6</td><td>12.12.12.4/30</td></tr>
+            <tr><td>sw1 &harr; Versa</td><td>Gi1/0/3</td><td>12.12.12.9</td><td>Vni-0/2</td><td>12.12.12.10</td><td>12.12.12.8/30</td></tr>
+            <tr><td>sw1 &harr; Cumulus</td><td>Gi1/0/4</td><td>12.12.12.13</td><td>swp1</td><td>12.12.12.14</td><td>12.12.12.12/30</td></tr>
+        </table>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 4. VLAN / VNI MAPPING -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-vlan-vni">
+    <h2 id="vlan-vni">4. VLAN / VNI Mapping</h2>
+    <div class="card">
+        <table>
+            <tr>
+                <th>VLAN</th><th>Name</th><th>VNI</th><th>Subnet</th><th>Purpose</th><th>Devices</th>
+            </tr>
+            <tr><td>1101</td><td>VRF1_CORE_VLAN</td><td>50101</td><td>&mdash;</td><td>L3VNI (Core Routing)</td><td>sw2, sw3</td></tr>
+            <tr><td><strong>1151</strong></td><td>VRF1_ACCESS_VLAN</td><td><strong>401151</strong></td><td>192.168.1.0/25</td><td>L2 Extension (All VTEPs)</td><td>sw2, sw3, Versa, Cumulus</td></tr>
+            <tr><td>1152</td><td>VRF1_ACCESS_VLAN_2</td><td>401152</td><td>192.168.2.0/25</td><td>Access VLAN</td><td>sw2, sw3</td></tr>
+            <tr><td>1153</td><td>VRF1_ACCESS_VLAN_3</td><td>401153</td><td>192.168.3.0/25</td><td>Access VLAN</td><td>sw2, sw3</td></tr>
+        </table>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 5. UNDERLAY CONFIGURATION (OSPF) -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-underlay">
+    <h2 id="underlay">5. Underlay Configuration (OSPF)</h2>
+
+    <div class="card" id="underlay-sw1">
+        <h3>5.1 sw1 &mdash; Spine (Cisco IOS-XE)</h3>
+        <span class="badge badge-cisco">CISCO</span>
+<pre><code>router ospf 100
+ router-id 1.1.1.1
+ auto-cost reference-bandwidth 100000
+
+interface Loopback0
+ ip address 1.1.1.1 255.255.255.255
+ ip ospf 100 area 100
+
+interface GigabitEthernet1/0/1
+ description to sw2
+ no switchport
+ ip address 12.12.12.1 255.255.255.252
+ ip ospf network point-to-point
+ ip ospf 100 area 100
+
+interface GigabitEthernet1/0/2
+ description to sw3
+ no switchport
+ ip address 12.12.12.5 255.255.255.252
+ ip ospf network point-to-point
+ ip ospf 100 area 100
+
+interface GigabitEthernet1/0/3
+ description to Versa FlexVNF
+ no switchport
+ ip address 12.12.12.9 255.255.255.252
+ ip mtu 1550
+ ip ospf network point-to-point
+ ip ospf mtu-ignore
+ ip ospf 100 area 100
+
+interface GigabitEthernet1/0/4
+ description to Cumulus_Nvidia
+ no switchport
+ ip address 12.12.12.13 255.255.255.252
+ ip mtu 1550
+ ip ospf network point-to-point
+ ip ospf mtu-ignore
+ ip ospf 100 area 100</code></pre>
+
+        <div class="alert-box alert-warning">
+            <strong>MTU Mismatch:</strong> Cumulus defaults to MTU 9216. Cisco uses 1550. <code>ip ospf mtu-ignore</code> is configured on both ends to prevent OSPF ExStart/DBD failures.
+        </div>
+    </div>
+
+    <div class="card" id="underlay-versa">
+        <h3>5.2 Versa &mdash; Underlay OSPF</h3>
+        <span class="badge badge-versa">VERSA</span>
+<pre><code>routing-instances routing-instance Underlay {
+  instance-type virtual-router
+  networks      [ OSPF_Underlay ]
+  evpn-core
+  interfaces    [ tvi-0/9005.0 ]
+  policy-options {
+    redistribution-policy Export-Vtep-To-OSPF {
+      term VTEP_IP {
+        match { address 1.1.1.4/32 }
+        action { accept }
+      }
+    }
+    redistribute-to-ospf Export-Vtep-To-OSPF
+  }
+  protocols {
+    ospf 4023 {
+      router-id     12.12.12.10
+      area 100 {
+        network-name OSPF_Underlay {
+          network-type    point-to-point
+          hello-interval  10
+          dead-interval   40
+        }
+      }
+    }
+  }
+}</code></pre>
+    </div>
+
+    <div class="card" id="underlay-verify">
+        <h3>5.3 OSPF Verification (sw1)</h3>
+<pre><code>sw1# show ip ospf neighbor
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+12.12.12.10       0   FULL/  -        00:00:32    12.12.12.10     GigabitEthernet1/0/3
+1.1.1.3           0   FULL/  -        00:00:39    12.12.12.6      GigabitEthernet1/0/2
+1.1.1.2           0   FULL/  -        00:00:31    12.12.12.2      GigabitEthernet1/0/1
+1.1.1.5           0   FULL/  -        00:00:37    12.12.12.14     GigabitEthernet1/0/4</code></pre>
+        <div class="alert-box alert-success">
+            <strong>Status:</strong> All four OSPF adjacencies are <strong>FULL</strong>.
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 6. BGP EVPN OVERLAY -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-bgp-evpn">
+    <h2 id="bgp-evpn">6. BGP EVPN Overlay</h2>
+
+    <div class="card" id="bgp-rr">
+        <h3>6.1 sw1 &mdash; Route Reflector</h3>
+        <span class="badge badge-cisco">CISCO</span>
+<pre><code>router bgp 6500
+ bgp router-id interface Loopback0
+ bgp log-neighbor-changes
+ template peer-session spine-peer-session
+  remote-as 6500
+  update-source Loopback0
+ exit-peer-session
+
+ neighbor 1.1.1.2 inherit peer-session spine-peer-session
+ neighbor 1.1.1.3 inherit peer-session spine-peer-session
+ neighbor 1.1.1.4 inherit peer-session spine-peer-session
+ neighbor 1.1.1.4 send-community both
+ neighbor 1.1.1.5 inherit peer-session spine-peer-session
+ neighbor 1.1.1.5 send-community both
+
+ address-family l2vpn evpn
+  neighbor 1.1.1.2 activate
+  neighbor 1.1.1.2 send-community both
+  neighbor 1.1.1.2 route-reflector-client
+  neighbor 1.1.1.3 activate
+  neighbor 1.1.1.3 send-community both
+  neighbor 1.1.1.4 activate
+  neighbor 1.1.1.4 send-community both
+  neighbor 1.1.1.4 route-reflector-client
+  neighbor 1.1.1.5 activate
+  neighbor 1.1.1.5 send-community both
+  neighbor 1.1.1.5 route-reflector-client
+ exit-address-family</code></pre>
+    </div>
+
+    <div class="card" id="bgp-versa">
+        <h3>6.2 Versa &mdash; BGP EVPN</h3>
+        <span class="badge badge-versa">VERSA</span>
+<pre><code>routing-instances routing-instance Underlay {
+  protocols {
+    bgp 3023 {
+      router-id     1.1.1.4
+      local-as { as-number 64515 }
+      group vxlan_internal {
+        type     internal
+        family { l2vpn { evpn } }
+        local-as 6500
+        neighbor 1.1.1.1 {
+          local-address tvi-0/9005.0
+        }
+      }
+    }
+  }
+}</code></pre>
+        <div class="alert-box alert-info">
+            <strong>Info:</strong> Versa uses <code>local-as 6500</code> override to match the fabric AS while keeping its internal AS 64515.
+        </div>
+    </div>
+
+    <div class="card" id="bgp-verify">
+        <h3>6.3 BGP Verification (sw1)</h3>
+<pre><code>sw1# show bgp l2vpn evpn summary
+
+BGP router identifier 1.1.1.1, local AS number 6500
+Neighbor        V    AS   MsgRcvd MsgSent  TblVer InQ OutQ Up/Down  State/PfxRcd
+1.1.1.2         4  6500      224     290     106    0    0 03:03:30       18
+1.1.1.3         4  6500      234     233     106    0    0 03:04:07       15
+1.1.1.4         4  6500      429     454     106    0    0 03:03:42        1
+1.1.1.5         4  6500     1148    1130       0    0    0 00:48:57        2</code></pre>
+        <div class="alert-box alert-success">
+            <strong>Status:</strong> All four EVPN peers <strong>Established</strong>.
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 7. L2VPN EVPN INSTANCES -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-l2vpn">
+    <h2 id="l2vpn">7. L2VPN EVPN Instances</h2>
+
+    <div class="card" id="rt-mapping">
+        <h3>7.1 Route Target Mapping</h3>
+        <table>
+            <tr><th>Device</th><th>RD</th><th>Export RT</th><th>Import RT</th></tr>
+            <tr>
+                <td><span class="badge badge-cisco">CISCO</span> sw2</td>
+                <td>1.1.1.2:1151 (auto)</td><td>1151:1</td><td>1151:1, 65000:1151, 2:2</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-cisco">CISCO</span> sw3</td>
+                <td>1.1.1.3:1151 (auto)</td><td>1151:1</td><td>1151:1</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-versa">VERSA</span></td>
+                <td>2L:122</td><td>2:2, 1151:1</td><td>2:2, 1151:1</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-cumulus">CUMULUS</span></td>
+                <td>1.1.1.5:2 (auto)</td><td>1151:1</td><td>1151:1</td>
+            </tr>
+        </table>
+        <div class="alert-box alert-warning">
+            <strong>Warning:</strong> Versa exports RT <code>2:2</code> in addition to <code>1151:1</code>. All devices import <code>1151:1</code> so Versa routes are received.
+        </div>
+    </div>
+
+    <div class="card" id="sw2-l2vpn">
+        <h3>7.2 sw2 &mdash; L2VPN &amp; NVE</h3>
+        <span class="badge badge-cisco">CISCO</span>
+<pre><code>l2vpn evpn instance 1151 vlan-based
+ encapsulation vxlan
+ route-target export 1151:1
+ route-target import 1151:1
+ route-target import 65000:1151
+ route-target import 2:2
+
+vlan configuration 1151
+ member evpn-instance 1151 vni 401151
+
+interface nve1
+ no ip address
+ source-interface Loopback0
+ host-reachability protocol bgp
+ member vni 50101 vrf VRF-1
+ member vni 401151 ingress-replication
+ member vni 401152 ingress-replication local-routing
+ member vni 401153 ingress-replication local-routing</code></pre>
+    </div>
+
+    <div class="card" id="versa-vswitch">
+        <h3>7.3 Versa &mdash; Virtual-Switch</h3>
+        <span class="badge badge-versa">VERSA</span>
+<pre><code>routing-instances routing-instance VERSA-default-switch {
+  instance-type       virtual-switch
+  bridge-options { l2vpn-service-type vlan }
+  bridge-domains {
+    VLAN-1151 {
+      vlan-id 1151
+      bridge-options { bridge-domain-arp-suppression enable }
+      vxlan { vni 401151 }
+    }
+  }
+  interfaces          [ vni-0/1.1 ]
+  route-distinguisher 2L:122
+  vrf-both-target     "target:2L:2 target:1151:1"
+  protocols {
+    evpn {
+      vlan-id-list  [ 1151 ]
+      encapsulation vxlan
+      core-instance Underlay
+    }
+  }
+}</code></pre>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 8. CUMULUS LINUX CONFIG -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-cumulus">
+    <h2 id="cumulus">8. Cumulus Linux (NVIDIA) &mdash; NVUE Configuration</h2>
+
+    <div class="alert-box alert-info" style="margin-bottom:15px;">
+        <strong>Platform:</strong> Cumulus Linux 5.x uses <strong>NVUE</strong> (<code>nv set</code>) as the primary configuration method.
+    </div>
+
+    <div class="card" id="nvue-commands">
+        <h3>8.1 Complete NVUE Commands</h3>
+        <span class="badge badge-cumulus">CUMULUS</span>
+<pre><code># -- Loopback (VTEP Source) --
+nv set interface lo type loopback
+nv set interface lo ip address 1.1.1.5/32
+
+# -- Underlay Link to sw1 --
+nv set interface swp1 type swp
+nv set interface swp1 link state up
+nv set interface swp1 ip address 12.12.12.14/30
+nv set interface swp1 link mtu 9216
+
+# -- OSPF Underlay --
+nv set router ospf enable on
+nv set router ospf router-id 1.1.1.5
+nv set vrf default router ospf enable on
+nv set vrf default router ospf router-id 1.1.1.5
+nv set interface lo router ospf enable on
+nv set interface lo router ospf area 100
+nv set interface swp1 router ospf enable on
+nv set interface swp1 router ospf area 100
+nv set interface swp1 router ospf network-type point-to-point
+nv set interface swp1 router ospf mtu-ignore on
+
+# -- BGP EVPN Overlay --
+nv set router bgp enable on
+nv set router bgp autonomous-system 6500
+nv set router bgp router-id 1.1.1.5
+nv set vrf default router bgp enable on
+nv set vrf default router bgp neighbor 1.1.1.1 remote-as internal
+nv set vrf default router bgp neighbor 1.1.1.1 type numbered
+nv set vrf default router bgp neighbor 1.1.1.1 update-source lo
+nv set vrf default router bgp address-family l2vpn-evpn enable on
+nv set vrf default router bgp neighbor 1.1.1.1 address-family l2vpn-evpn enable on
+
+# -- VXLAN / NVE --
+nv set nve vxlan enable on
+nv set nve vxlan source address 1.1.1.5
+nv set evpn enable on
+
+# -- Bridge + VLAN 1151 + VNI --
+nv set bridge domain br_default vlan 1151 vni 401151
+nv set evpn vni 401151 route-target export 1151:1
+nv set evpn vni 401151 route-target import 1151:1
+
+# -- Trunk Port (swp2) --
+nv set interface swp2 type swp
+nv set interface swp2 link state up
+nv set interface swp2 bridge domain br_default
+nv set interface swp2 bridge domain br_default stp admin-edge on
+nv set interface swp2 bridge domain br_default stp bpdu-guard on
+
+# -- SVI for VLAN 1151 --
+nv set interface vlan1151 type svi
+nv set interface vlan1151 vlan 1151
+nv set interface vlan1151 ip address 192.168.1.15/25
+
+# -- Apply --
+nv config apply -y</code></pre>
+    </div>
+
+    <div class="card" id="cumulus-verify">
+        <h3>8.2 Cumulus Verification</h3>
+        <h4>OSPF Neighbor</h4>
+<pre><code>cumulus@cumulus:~$ sudo vtysh -c "show ip ospf neighbor"
+Neighbor ID     Pri State           Dead Time Address         Interface
+1.1.1.1           1 Full/DROther      39.892s 12.12.12.13     swp1:12.12.12.14</code></pre>
+
+        <h4>BGP EVPN Summary</h4>
+<pre><code>cumulus@cumulus:~$ sudo vtysh -c "show bgp l2vpn evpn summary"
+BGP router identifier 1.1.1.5, local AS number 6500 vrf-id 0
+Peers 1, using 23 KiB of memory
+Neighbor        V   AS   MsgRcvd  MsgSent  Up/Down  State/PfxRcd  PfxSnt
+1.1.1.1         4  6500    1148     1130   00:48:57           25       2</code></pre>
+
+        <h4>EVPN VNI Detail</h4>
+<pre><code>cumulus@cumulus:~$ sudo vtysh -c "show evpn vni 401151"
+VNI: 401151
+Type: L2
+Vlan: 1151
+Bridge: br_default
+VxLAN interface: vxlan48
+Local VTEP IP: 1.1.1.5
+Remote VTEPs for this VNI:
+  1.1.1.4 flood: HER
+  1.1.1.3 flood: HER
+  1.1.1.2 flood: HER
+Number of MACs (local and remote): 6
+Number of ARPs (local and remote): 6</code></pre>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 9. NVE PEER VERIFICATION -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-nve-peers">
+    <h2 id="nve-peers">9. NVE Peer Verification</h2>
+    <div class="card">
+        <h3>sw2 &mdash; NVE Peers for VNI 401151</h3>
+        <span class="badge badge-cisco">CISCO</span>
+<pre><code>sw2# show nve peers vni 401151
+Interface  VNI      Type Peer-IP     RMAC/Num_RTs  eVNI     state  UP time
+nve1       401151   L2CP 1.1.1.3     3             401151     UP   06:01:13
+nve1       401151   L2CP 1.1.1.4     1             401151     UP   00:49:17
+nve1       401151   L2CP 1.1.1.5     2             401151     UP   00:48:57</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>Cumulus &mdash; VXLAN Interface Detail</h3>
+        <span class="badge badge-cumulus">CUMULUS</span>
+<pre><code>cumulus@cumulus:~$ ip -d link show vxlan48
+14: vxlan48:  mtu 9216
+    master br_default state UNKNOWN
+    vxlan id 401151 local 1.1.1.5 dstport 4789
+    nolearning ttl 64 udpcsum gbp
+    bridge_slave state forwarding learning off neigh_suppress on</code></pre>
+        <div class="alert-box alert-info">
+            <strong>Key Flags:</strong> <code>nolearning</code> = EVPN controls FDB, <code>neigh_suppress</code> = ARP suppression, <code>gbp</code> = VXLAN-GBP enabled (required for Versa interop).
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 10. MAC ADDRESS LEARNING -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-mac-learning">
+    <h2 id="mac-learning">10. MAC Address Learning</h2>
+
+    <div class="card">
+        <h3>Versa Bridge Table</h3>
+        <span class="badge badge-versa">VERSA</span>
+<pre><code>admin@Cisco-EVPN-Br1-cli> show bridge
+ROUTING INSTANCE         BRIDGE     MAC-ADDRESS        TYPE  VLAN  TUNNEL EP
+VERSA-default-switch     VLAN-1151  aa:bb:cc:00:27:00  CA    1151  1.1.1.3
+VERSA-default-switch     VLAN-1151  aa:bb:cc:00:24:00  CA    1151  1.1.1.2</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>sw2 EVPN MAC Table</h3>
+        <span class="badge badge-cisco">CISCO</span>
+<pre><code>sw2# show l2vpn evpn mac evi 1151
+MAC Address    EVI   VLAN  Next Hop(s)
+aabb.cc00.2400 1151  1151  Gi1/0/4:1151    (local)
+aabb.cc00.2700 1151  1151  1.1.1.3         (remote - sw3)
+aabb.cc00.2f10 1151  1151  1.1.1.4         (remote - Versa)</code></pre>
+        <div class="alert-box alert-success">
+            <strong>Status:</strong> Cross-Vendor MAC Learning <strong>Confirmed</strong>. MACs from all vendors visible in EVPN tables.
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 11. VXLAN-GBP ISSUE -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-gbp-issue">
+    <h2 id="gbp-issue">11. VXLAN-GBP Interoperability Issue</h2>
+
+    <div class="alert-box alert-danger" style="margin-bottom:15px;">
+        <strong>SEVERITY: HIGH</strong> &mdash; Ping from Cumulus client (192.168.1.12) to Versa client (192.168.1.10) fails with <strong>100% packet loss</strong>.
+    </div>
+
+    <div class="card">
+        <p><strong>Root Cause:</strong> Versa FlexVNF sends VXLAN packets with GBP flags (<code>0x88</code> instead of <code>0x08</code>). The Linux kernel drops GBP-flagged packets on non-GBP VXLAN interfaces.</p>
+    </div>
+
+    <div class="card" id="what-is-gbp">
+        <h3>11.1 What is VXLAN-GBP?</h3>
+        <p>VXLAN-GBP adds a <strong>Group Policy ID (SGT)</strong> to the VXLAN header.</p>
+        <ul>
+            <li><strong>Standard VXLAN (RFC 7348):</strong> flags byte = <code>0x08</code> (I-bit only)</li>
+            <li><strong>VXLAN-GBP (Versa):</strong> flags byte = <code>0x88</code> (G-bit + I-bit)</li>
+        </ul>
+        <h4>VXLAN Header Flags Bits</h4>
+        <table>
+            <tr><th>Bit</th><th>Name</th><th>Description</th></tr>
+            <tr><td>G (bit 0)</td><td>GBP Extension</td><td>When set, indicates GBP header present</td></tr>
+            <tr><td>D (bit 3)</td><td>Don't Learn</td><td>Tells remote VTEP not to learn source MAC</td></tr>
+            <tr><td>I (bit 4)</td><td>VNI Valid</td><td>Same as standard VXLAN</td></tr>
+            <tr><td>A (bit 7)</td><td>Applied</td><td>Policy already applied at source</td></tr>
+        </table>
+    </div>
+
+    <div class="card" id="packet-capture">
+        <h3>11.2 Packet Capture Evidence</h3>
+<pre><code>Frame  Source (outer)           Destination (outer)      Flags   VNI
+-----  ----------------------  -----------------------  ------  ------
+11     1.1.1.5 Cumulus      -> 1.1.1.4 Versa            0x0800  401151
+12     1.1.1.4 Versa        -> 1.1.1.5 Cumulus           0x8808  401151
+13     1.1.1.5 Cumulus      -> 1.1.1.4 Versa            0x0800  401151
+14     1.1.1.4 Versa        -> 1.1.1.5 Cumulus           0x8808  401151</code></pre>
+        <div class="alert-box alert-warning">
+            Frames 12 and 14 from Versa show flags <code>0x8808</code> (GBP-enabled), while Cumulus sends standard <code>0x0800</code>.
+        </div>
+    </div>
+
+    <div class="card" id="hex-dump">
+        <h3>11.3 Raw Hex Dump Analysis</h3>
+        <h4>Packet 11 &mdash; Cumulus &rarr; Versa &mdash; Standard VXLAN</h4>
+<pre><code>VXLAN flags: 08 = 0000 1000 = I-bit only (standard)</code></pre>
+
+        <h4>Packet 12 &mdash; Versa &rarr; Cumulus &mdash; VXLAN-GBP</h4>
+<pre><code>VXLAN flags: 88 = 1000 1000 = G-bit + I-bit (GBP!)
+Group Policy ID: 0x08 = SGT 8</code></pre>
+    </div>
+
+    <div class="card" id="why-fails">
+        <h3>11.4 Why This Causes Failure</h3>
+<pre class="topology-ascii">Cumulus Client   Cumulus VTEP      Versa VTEP       Versa Client
+192.168.1.12     1.1.1.5           1.1.1.4          192.168.1.10
+     |               |                |                   |
+     |-- ICMP Req -> |                |                   |
+     |               |== VXLAN 0x08 =>|                   |
+     |               |   (standard)   |-- ICMP Req ----> |
+     |               |                |                   |
+     |               |                |<-- ICMP Reply --- |
+     |               |<= VXLAN 0x88 ==|                   |
+     |               |   (GBP!)       |                   |
+     |            [DROPPED]           |                   |
+     |         kernel rejects GBP     |                   |</pre>
+        <p>The Linux kernel on Cumulus <strong>drops</strong> inbound VXLAN packets that contain GBP flags when the local VXLAN interface was not created with the <code>gbp</code> option. The ICMP request reaches Versa, but the reply is discarded by Cumulus.</p>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 12. GBP FIX & RESOLUTION -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-gbp-fix">
+    <h2 id="gbp-fix">12. VXLAN-GBP Fix &amp; Resolution</h2>
+
+    <div class="card">
+        <h3>Impact Summary</h3>
+        <table>
+            <tr><th>Attribute</th><th>Detail</th></tr>
+            <tr><td>Affected Traffic</td><td>Cumulus &harr; Versa (data plane only)</td></tr>
+            <tr><td>Root Cause</td><td>Versa always sends VXLAN-GBP headers (flags=0x88)</td></tr>
+            <tr><td>Control Plane</td><td class="status-ok">Not affected</td></tr>
+            <tr><td>Cisco Impact</td><td class="status-ok">None &mdash; IOS-XE ignores GBP bits</td></tr>
+            <tr><td>Fix Required On</td><td><strong>Cumulus Linux only</strong></td></tr>
+        </table>
+    </div>
+
+    <div class="card" id="fix-recreate">
+        <h3>12.1 Step 1 &mdash; Recreate vxlan48 with GBP</h3>
+        <span class="badge badge-cumulus">CUMULUS</span>
+<pre><code>sudo ip link del vxlan48
+sudo ip link add vxlan48 type vxlan id 401151 local 1.1.1.5 dstport 4789 nolearning gbp
+sudo ip link set vxlan48 up</code></pre>
+    </div>
+
+    <div class="card" id="fix-restore">
+        <h3>12.2 Step 2 &mdash; Restore Bridge and VLAN Settings</h3>
+        <span class="badge badge-cumulus">CUMULUS</span>
+<pre><code>sudo ip link set vxlan48 master br_default
+sudo bridge vlan del vid 1 dev vxlan48
+sudo bridge vlan add vid 1151 dev vxlan48 pvid untagged
+sudo bridge link set dev vxlan48 state 3
+sudo ip link set vxlan48 mtu 9216
+sudo bridge link set dev vxlan48 learning off
+sudo bridge link set dev vxlan48 neigh_suppress on
+sudo bridge link set dev vxlan48 vlan_tunnel on</code></pre>
+
+        <div class="alert-box alert-danger">
+            <strong>VLAN Mapping Pitfall:</strong> When vxlan48 is recreated, bridge assigns <strong>VLAN 1</strong> as default PVID. You <strong>must</strong> delete vid 1 and add vid 1151 explicitly.
+        </div>
+        <div class="alert-box alert-warning">
+            <strong>Warning:</strong> This fix is <strong>not persistent</strong> across reboots. Configure a post-boot script or edit <code>/etc/network/interfaces</code>.
+        </div>
+    </div>
+
+    <div class="card" id="fix-verify">
+        <h3>12.3 Post-Fix Verification</h3>
+        <h4>Verify GBP Flag</h4>
+<pre><code>cumulus@cumulus:~$ ip -d link show vxlan48 | grep -i gbp
+    vxlan id 401151 local 1.1.1.5 dstport 4789 nolearning ttl 64 udpcsum gbp</code></pre>
+
+        <h4>Verify VLAN Mapping</h4>
+<pre><code>cumulus@cumulus:~$ bridge vlan show dev vxlan48
+port     vlan ids
+vxlan48  1151 PVID Egress Untagged</code></pre>
+
+        <h4>Verify EVPN VNI</h4>
+<pre><code>cumulus@cumulus:~$ sudo vtysh -c "show evpn vni 401151" | grep Vlan
+  Vlan: 1151          &lt;- must be 1151, NOT 1</code></pre>
+
+        <div class="alert-box alert-success">
+            <strong>Result:</strong> After applying the GBP fix, ping between Cumulus client (192.168.1.12) and Versa client (192.168.1.10) succeeds with 0% packet loss.
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 13. COMMAND REFERENCE -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-cmd-ref">
+    <h2 id="cmd-ref">13. Command Reference</h2>
+
+    <div class="card">
+        <h3><span class="badge badge-cisco">CISCO</span> IOS-XE Commands</h3>
+        <table>
+            <tr><th>Command</th><th>Purpose</th></tr>
+            <tr><td><code>show ip ospf neighbor</code></td><td>Verify OSPF adjacencies</td></tr>
+            <tr><td><code>show bgp l2vpn evpn summary</code></td><td>Verify BGP EVPN peer status</td></tr>
+            <tr><td><code>show bgp l2vpn evpn</code></td><td>View full EVPN routing table</td></tr>
+            <tr><td><code>show nve peers</code></td><td>View all NVE VXLAN peers</td></tr>
+            <tr><td><code>show nve peers vni 401151</code></td><td>View NVE peers for specific VNI</td></tr>
+            <tr><td><code>show nve vni</code></td><td>View all VNI mappings</td></tr>
+            <tr><td><code>show l2vpn evpn mac evi 1151</code></td><td>View learned MAC addresses for EVI 1151</td></tr>
+            <tr><td><code>show l2vpn evpn evi 1151 detail</code></td><td>View detailed EVI configuration</td></tr>
+            <tr><td><code>show vlan id 1151</code></td><td>Verify VLAN configuration</td></tr>
+            <tr><td><code>show ip ospf interface brief</code></td><td>Verify OSPF interface status</td></tr>
+            <tr><td><code>show ip route ospf</code></td><td>View OSPF learned routes</td></tr>
+            <tr><td><code>show interface nve1</code></td><td>NVE tunnel interface status</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3><span class="badge badge-cumulus">CUMULUS</span> Linux Commands</h3>
+        <table>
+            <tr><th>Command</th><th>Purpose</th></tr>
+            <tr><td><code>sudo vtysh -c "show ip ospf neighbor"</code></td><td>Verify OSPF adjacencies</td></tr>
+            <tr><td><code>sudo vtysh -c "show bgp l2vpn evpn summary"</code></td><td>Verify BGP EVPN peer status</td></tr>
+            <tr><td><code>sudo vtysh -c "show bgp l2vpn evpn"</code></td><td>View full EVPN routing table</td></tr>
+            <tr><td><code>sudo vtysh -c "show evpn vni 401151"</code></td><td>View EVPN VNI detail</td></tr>
+            <tr><td><code>sudo vtysh -c "show evpn mac vni 401151"</code></td><td>View learned MACs for VNI</td></tr>
+            <tr><td><code>ip -d link show vxlan48</code></td><td>VXLAN interface details (check gbp flag)</td></tr>
+            <tr><td><code>bridge vlan show dev vxlan48</code></td><td>Verify VLAN-to-VNI mapping</td></tr>
+            <tr><td><code>bridge fdb show dev vxlan48</code></td><td>View FDB (MAC) entries</td></tr>
+            <tr><td><code>nv show evpn vni 401151</code></td><td>NVUE VNI status</td></tr>
+            <tr><td><code>nv show interface swp1 router ospf</code></td><td>NVUE OSPF interface config</td></tr>
+            <tr><td><code>nv config apply -y</code></td><td>Apply pending NVUE configuration</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3><span class="badge badge-versa">VERSA</span> FlexVNF Commands</h3>
+        <table>
+            <tr><th>Command</th><th>Purpose</th></tr>
+            <tr><td><code>show bridge</code></td><td>View bridge/MAC table</td></tr>
+            <tr><td><code>show ospf neighbor</code></td><td>Verify OSPF adjacencies</td></tr>
+            <tr><td><code>show bgp summary</code></td><td>BGP peer summary</td></tr>
+            <tr><td><code>show bgp l2vpn evpn</code></td><td>EVPN route table</td></tr>
+            <tr><td><code>show vxlan tunnel</code></td><td>VXLAN tunnel status</td></tr>
+            <tr><td><code>show routing-instance</code></td><td>View routing instance config</td></tr>
+            <tr><td><code>show interface tvi-0/9005.0</code></td><td>Underlay interface status</td></tr>
+        </table>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 14. MULTI-VENDOR COMPARISON -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-comparison">
+    <h2 id="comparison">14. Multi-Vendor Configuration Comparison</h2>
+
+    <!-- 14.1 OSPF Underlay -->
+    <div class="card" id="cmp-ospf">
+        <h3>14.1 OSPF Underlay Configuration</h3>
+        <div class="vendor-compare">
+            <div class="vendor-col cisco-col">
+                <h4><span class="badge badge-cisco">CISCO</span> IOS-XE</h4>
+<pre><code>router ospf 100
+ router-id 1.1.1.1
+ auto-cost reference-bandwidth 100000
+
+interface Loopback0
+ ip address 1.1.1.1 255.255.255.255
+ ip ospf 100 area 100
+
+interface Gi1/0/1
+ ip address 12.12.12.1 255.255.255.252
+ ip ospf network point-to-point
+ ip ospf 100 area 100</code></pre>
+            </div>
+            <div class="vendor-col versa-col">
+                <h4><span class="badge badge-versa">VERSA</span> FlexVNF</h4>
+<pre><code>routing-instances routing-instance Underlay {
+  protocols {
+    ospf 4023 {
+      router-id 12.12.12.10
+      area 100 {
+        network-name OSPF_Underlay {
+          network-type point-to-point
+          hello-interval 10
+          dead-interval  40
+        }
+      }
+    }
+  }
+  policy-options {
+    redistribute-to-ospf
+      Export-Vtep-To-OSPF
+  }
+}</code></pre>
+            </div>
+            <div class="vendor-col cumulus-col">
+                <h4><span class="badge badge-cumulus">CUMULUS</span> NVUE</h4>
+<pre><code>nv set router ospf enable on
+nv set router ospf router-id 1.1.1.5
+nv set vrf default router ospf
+  enable on
+nv set vrf default router ospf
+  router-id 1.1.1.5
+
+nv set interface lo router ospf
+  enable on
+nv set interface lo router ospf
+  area 100
+nv set interface swp1 router ospf
+  enable on
+nv set interface swp1 router ospf
+  area 100
+nv set interface swp1 router ospf
+  network-type point-to-point
+nv set interface swp1 router ospf
+  mtu-ignore on</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- 14.2 BGP EVPN Overlay -->
+    <div class="card" id="cmp-bgp">
+        <h3>14.2 BGP EVPN Overlay Configuration</h3>
+        <div class="vendor-compare">
+            <div class="vendor-col cisco-col">
+                <h4><span class="badge badge-cisco">CISCO</span> IOS-XE</h4>
+<pre><code>router bgp 6500
+ bgp router-id interface Loopback0
+ template peer-session spine-peer-session
+  remote-as 6500
+  update-source Loopback0
+ exit-peer-session
+
+ neighbor 1.1.1.2 inherit
+   peer-session spine-peer-session
+
+ address-family l2vpn evpn
+  neighbor 1.1.1.2 activate
+  neighbor 1.1.1.2 send-community both
+  neighbor 1.1.1.2
+    route-reflector-client
+ exit-address-family</code></pre>
+            </div>
+            <div class="vendor-col versa-col">
+                <h4><span class="badge badge-versa">VERSA</span> FlexVNF</h4>
+<pre><code>protocols {
+  bgp 3023 {
+    router-id 1.1.1.4
+    local-as { as-number 64515 }
+    group vxlan_internal {
+      type     internal
+      family {
+        l2vpn { evpn }
+      }
+      local-as 6500
+      neighbor 1.1.1.1 {
+        local-address tvi-0/9005.0
+      }
+    }
+  }
+}
+
+Note: local-as 6500 overrides
+internal AS 64515 to match fabric.</code></pre>
+            </div>
+            <div class="vendor-col cumulus-col">
+                <h4><span class="badge badge-cumulus">CUMULUS</span> NVUE</h4>
+<pre><code>nv set router bgp enable on
+nv set router bgp
+  autonomous-system 6500
+nv set router bgp router-id 1.1.1.5
+nv set vrf default router bgp
+  enable on
+nv set vrf default router bgp
+  neighbor 1.1.1.1
+  remote-as internal
+nv set vrf default router bgp
+  neighbor 1.1.1.1
+  type numbered
+nv set vrf default router bgp
+  neighbor 1.1.1.1
+  update-source lo
+nv set vrf default router bgp
+  address-family l2vpn-evpn
+  enable on
+nv set vrf default router bgp
+  neighbor 1.1.1.1
+  address-family l2vpn-evpn
+  enable on</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- 14.3 VXLAN / L2VPN Instance -->
+    <div class="card" id="cmp-vxlan">
+        <h3>14.3 VXLAN / L2VPN Instance Configuration</h3>
+        <div class="vendor-compare">
+            <div class="vendor-col cisco-col">
+                <h4><span class="badge badge-cisco">CISCO</span> IOS-XE</h4>
+<pre><code>l2vpn evpn instance 1151 vlan-based
+ encapsulation vxlan
+ route-target export 1151:1
+ route-target import 1151:1
+ route-target import 2:2
+
+vlan configuration 1151
+ member evpn-instance 1151 vni 401151
+
+interface nve1
+ source-interface Loopback0
+ host-reachability protocol bgp
+ member vni 401151
+   ingress-replication</code></pre>
+            </div>
+            <div class="vendor-col versa-col">
+                <h4><span class="badge badge-versa">VERSA</span> FlexVNF</h4>
+<pre><code>routing-instances
+ routing-instance
+  VERSA-default-switch {
+  instance-type virtual-switch
+  bridge-domains {
+    VLAN-1151 {
+      vlan-id 1151
+      vxlan { vni 401151 }
+    }
+  }
+  route-distinguisher 2L:122
+  vrf-both-target
+    "target:2L:2 target:1151:1"
+  protocols {
+    evpn {
+      vlan-id-list [ 1151 ]
+      encapsulation vxlan
+      core-instance Underlay
+    }
+  }
+}</code></pre>
+            </div>
+            <div class="vendor-col cumulus-col">
+                <h4><span class="badge badge-cumulus">CUMULUS</span> NVUE</h4>
+<pre><code>nv set nve vxlan enable on
+nv set nve vxlan source address
+  1.1.1.5
+nv set evpn enable on
+
+nv set bridge domain br_default
+  vlan 1151 vni 401151
+nv set evpn vni 401151
+  route-target export 1151:1
+nv set evpn vni 401151
+  route-target import 1151:1
+
+nv set interface swp2 bridge
+  domain br_default
+nv set interface vlan1151 type svi
+nv set interface vlan1151 vlan 1151
+nv set interface vlan1151 ip address
+  192.168.1.15/25</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- 14.4 OSPF Neighbor Verification -->
+    <div class="card" id="cmp-ospf-verify">
+        <h3>14.4 OSPF Neighbor Verification</h3>
+        <div class="vendor-compare">
+            <div class="vendor-col cisco-col">
+                <h4><span class="badge badge-cisco">CISCO</span> IOS-XE</h4>
+<pre><code>sw1# show ip ospf neighbor
+
+Neighbor ID     Pri   State
+12.12.12.10       0   FULL/  -
+1.1.1.3           0   FULL/  -
+1.1.1.2           0   FULL/  -
+1.1.1.5           0   FULL/  -</code></pre>
+            </div>
+            <div class="vendor-col versa-col">
+                <h4><span class="badge badge-versa">VERSA</span> FlexVNF</h4>
+<pre><code>admin@FlexVNF-cli>
+  show ospf neighbor
+
+Neighbor: 1.1.1.1
+  State: Full
+  Interface: tvi-0/9005.0
+  Area: 100</code></pre>
+            </div>
+            <div class="vendor-col cumulus-col">
+                <h4><span class="badge badge-cumulus">CUMULUS</span> NVUE</h4>
+<pre><code>cumulus@cumulus:~$
+sudo vtysh -c "show ip ospf neighbor"
+
+Neighbor ID  Pri State
+1.1.1.1        1 Full/DROther
+  39.892s  12.12.12.13
+  swp1:12.12.12.14</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- 14.5 BGP EVPN Peer Verification -->
+    <div class="card" id="cmp-bgp-verify">
+        <h3>14.5 BGP EVPN Peer Verification</h3>
+        <div class="vendor-compare">
+            <div class="vendor-col cisco-col">
+                <h4><span class="badge badge-cisco">CISCO</span> IOS-XE</h4>
+<pre><code>sw1# show bgp l2vpn evpn summary
+
+Neighbor   V  AS   Up/Down  PfxRcd
+1.1.1.2    4  6500 03:03:30     18
+1.1.1.3    4  6500 03:04:07     15
+1.1.1.4    4  6500 03:03:42      1
+1.1.1.5    4  6500 00:48:57      2</code></pre>
+            </div>
+            <div class="vendor-col versa-col">
+                <h4><span class="badge badge-versa">VERSA</span> FlexVNF</h4>
+<pre><code>admin@FlexVNF-cli>
+  show bgp summary
+
+Neighbor: 1.1.1.1
+  AS: 6500
+  State: Established
+  PfxRcd: 25
+  Up/Down: 03:03:42</code></pre>
+            </div>
+            <div class="vendor-col cumulus-col">
+                <h4><span class="badge badge-cumulus">CUMULUS</span> NVUE</h4>
+<pre><code>cumulus@cumulus:~$
+sudo vtysh -c
+  "show bgp l2vpn evpn summary"
+
+Neighbor   V  AS   Up/Down  PfxRcd
+1.1.1.1    4  6500 00:48:57     25</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- 14.6 VXLAN Tunnel / NVE Peer Verification -->
+    <div class="card" id="cmp-nve-verify">
+        <h3>14.6 VXLAN Tunnel / NVE Peer Verification</h3>
+        <div class="vendor-compare">
+            <div class="vendor-col cisco-col">
+                <h4><span class="badge badge-cisco">CISCO</span> IOS-XE</h4>
+<pre><code>sw2# show nve peers vni 401151
+
+VNI    Peer-IP  state  UP time
+401151 1.1.1.3    UP   06:01:13
+401151 1.1.1.4    UP   00:49:17
+401151 1.1.1.5    UP   00:48:57</code></pre>
+            </div>
+            <div class="vendor-col versa-col">
+                <h4><span class="badge badge-versa">VERSA</span> FlexVNF</h4>
+<pre><code>admin@FlexVNF-cli>
+  show vxlan tunnel
+
+Tunnel Endpoints:
+  1.1.1.2  VNI: 401151  UP
+  1.1.1.3  VNI: 401151  UP
+  1.1.1.5  VNI: 401151  UP</code></pre>
+            </div>
+            <div class="vendor-col cumulus-col">
+                <h4><span class="badge badge-cumulus">CUMULUS</span> NVUE</h4>
+<pre><code>cumulus@cumulus:~$
+sudo vtysh -c "show evpn vni 401151"
+
+Remote VTEPs for this VNI:
+  1.1.1.4 flood: HER
+  1.1.1.3 flood: HER
+  1.1.1.2 flood: HER</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- 14.7 MAC Address Table Verification -->
+    <div class="card" id="cmp-mac-verify">
+        <h3>14.7 MAC Address Table Verification (VLAN 1151)</h3>
+        <div class="vendor-compare">
+            <div class="vendor-col cisco-col">
+                <h4><span class="badge badge-cisco">CISCO</span> IOS-XE</h4>
+<pre><code>sw2# show l2vpn evpn mac evi 1151
+
+MAC Address    Next Hop(s)
+aabb.cc00.2400 Gi1/0/4:1151  (local)
+aabb.cc00.2700 1.1.1.3       (sw3)
+aabb.cc00.2f10 1.1.1.4       (Versa)</code></pre>
+            </div>
+            <div class="vendor-col versa-col">
+                <h4><span class="badge badge-versa">VERSA</span> FlexVNF</h4>
+<pre><code>admin@FlexVNF-cli> show bridge
+
+BRIDGE     MAC-ADDRESS        TUNNEL EP
+VLAN-1151  aa:bb:cc:00:27:00  1.1.1.3
+VLAN-1151  aa:bb:cc:00:24:00  1.1.1.2</code></pre>
+            </div>
+            <div class="vendor-col cumulus-col">
+                <h4><span class="badge badge-cumulus">CUMULUS</span> NVUE</h4>
+<pre><code>cumulus@cumulus:~$
+sudo vtysh -c
+  "show evpn mac vni 401151"
+
+MAC               Type  Intf/Remote
+aa:bb:cc:00:24:00 remote 1.1.1.2
+aa:bb:cc:00:27:00 remote 1.1.1.3
+aa:bb:cc:00:2f:10 remote 1.1.1.4</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 15. LESSONS LEARNED -->
+<!-- ============================================================ -->
+<div class="section-panel" id="panel-lessons">
+    <h2 id="lessons">15. Lessons Learned</h2>
+
+    <div class="card">
+        <h3>Issues Encountered &amp; Resolutions</h3>
+        <table>
+            <tr><th>#</th><th>Issue</th><th>Impact</th><th>Resolution</th></tr>
+            <tr>
+                <td>1</td>
+                <td><strong>VXLAN-GBP Flag Mismatch</strong></td>
+                <td class="status-fail">100% data plane failure Cumulus &harr; Versa</td>
+                <td>Enable <code>gbp</code> on Cumulus VXLAN interface</td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td><strong>VLAN-VNI Mapping after Recreation</strong></td>
+                <td class="status-fail">VNI maps to VLAN 1 instead of 1151</td>
+                <td><code>bridge vlan del vid 1</code>, then <code>add vid 1151</code></td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td><strong>OSPF MTU Mismatch</strong></td>
+                <td class="status-fail">OSPF stuck in ExStart</td>
+                <td><code>ip ospf mtu-ignore</code> on both ends</td>
+            </tr>
+            <tr>
+                <td>4</td>
+                <td><strong>Cumulus NVUE OSPF Context</strong></td>
+                <td class="status-fail">OSPF daemon won't activate</td>
+                <td>Must use: <code>nv set vrf default router ospf enable on</code></td>
+            </tr>
+            <tr>
+                <td>5</td>
+                <td><strong>Versa Route Target</strong></td>
+                <td>Versa exports RT 2:2 + 1151:1</td>
+                <td>All VTEPs import <code>1151:1</code></td>
+            </tr>
+            <tr>
+                <td>6</td>
+                <td><strong>swp2 Access vs Trunk Mode</strong></td>
+                <td class="status-fail">Client tagged frames dropped</td>
+                <td>Keep swp2 as trunk mode</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>Recommendations</h3>
+        <ul>
+            <li><strong>GBP Persistence:</strong> Edit <code>/etc/network/interfaces</code> or create a post-boot script to ensure the <code>gbp</code> flag survives reboots.</li>
+            <li><strong>Monitoring:</strong> Check VXLAN flags after every <code>nv config apply</code> &mdash; NVUE may recreate the VXLAN interface without the <code>gbp</code> flag.</li>
+            <li><strong>Packet Captures:</strong> Always check the VXLAN flags byte in multi-vendor environments. Different vendors may use different header extensions.</li>
+            <li><strong>MTU Standardization:</strong> Standardize underlay MTU across all vendors. Use <code>ip ospf mtu-ignore</code> as a workaround, but aim for consistent MTU values.</li>
+        </ul>
+    </div>
+
+    <div class="footer">
+        INTERNAL ENGINEERING DOCUMENT | Multi-Vendor EVPN VXLAN v2.0 | February 2026 | Generated with Claude Code
+    </div>
+</div>
+
+</main>
+
+<!-- JavaScript -->
+<script>
+    const sections = [
+        'summary', 'topology', 'inventory', 'vlan-vni', 'underlay',
+        'bgp-evpn', 'l2vpn', 'cumulus', 'nve-peers', 'mac-learning',
+        'gbp-issue', 'gbp-fix', 'cmd-ref', 'comparison', 'lessons'
+    ];
+
+    function showSection(sectionId, scrollToId) {
+        // Hide all panels
+        document.querySelectorAll('.section-panel').forEach(function(panel) {
+            panel.classList.remove('active');
+        });
+
+        // Show selected panel
+        var panel = document.getElementById('panel-' + sectionId);
+        if (panel) {
+            panel.classList.add('active');
+        }
+
+        // Update active nav link
+        document.querySelectorAll('.sidebar-nav a[data-section]').forEach(function(link) {
+            link.classList.remove('active');
+        });
+        document.querySelectorAll('.sidebar-nav a[data-section="' + sectionId + '"]').forEach(function(link) {
+            if (!scrollToId && !link.getAttribute('data-scroll')) {
+                link.classList.add('active');
+            } else if (scrollToId && link.getAttribute('data-scroll') === scrollToId) {
+                link.classList.add('active');
+            } else if (!scrollToId && !link.classList.contains('indent')) {
+                link.classList.add('active');
+            }
+        });
+
+        // Collapse all sub-items, expand only the active section's
+        document.querySelectorAll('.sidebar-nav .sub-items').forEach(function(sub) {
+            sub.classList.remove('expanded');
+        });
+        var activeSub = document.querySelector('.sidebar-nav .sub-items[data-parent="' + sectionId + '"]');
+        if (activeSub) {
+            activeSub.classList.add('expanded');
+        }
+
+        // Update URL hash
+        var hashId = scrollToId || sectionId;
+        if (history.replaceState) {
+            history.replaceState(null, null, '#' + hashId);
+        }
+
+        // Scroll content area to top, then to sub-section if needed
+        var contentArea = document.getElementById('content-area');
+        contentArea.scrollTop = 0;
+
+        if (scrollToId) {
+            setTimeout(function() {
+                var target = document.getElementById(scrollToId);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 50);
+        }
+
+        // Close sidebar on mobile
+        if (window.innerWidth <= 900) {
+            document.getElementById('sidebar').classList.remove('open');
+        }
+    }
+
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    // Map sub-section IDs to their parent section
+    var subSectionMap = {
+        'underlay-links': 'inventory',
+        'underlay-sw1': 'underlay',
+        'underlay-versa': 'underlay',
+        'underlay-verify': 'underlay',
+        'bgp-rr': 'bgp-evpn',
+        'bgp-versa': 'bgp-evpn',
+        'bgp-verify': 'bgp-evpn',
+        'rt-mapping': 'l2vpn',
+        'sw2-l2vpn': 'l2vpn',
+        'versa-vswitch': 'l2vpn',
+        'nvue-commands': 'cumulus',
+        'cumulus-verify': 'cumulus',
+        'what-is-gbp': 'gbp-issue',
+        'packet-capture': 'gbp-issue',
+        'hex-dump': 'gbp-issue',
+        'why-fails': 'gbp-issue',
+        'fix-recreate': 'gbp-fix',
+        'fix-restore': 'gbp-fix',
+        'fix-verify': 'gbp-fix',
+        'cmp-ospf': 'comparison',
+        'cmp-bgp': 'comparison',
+        'cmp-vxlan': 'comparison',
+        'cmp-ospf-verify': 'comparison',
+        'cmp-bgp-verify': 'comparison',
+        'cmp-nve-verify': 'comparison',
+        'cmp-mac-verify': 'comparison'
+    };
+
+    // Handle hash on load and hashchange
+    function handleHash() {
+        var hash = window.location.hash.replace('#', '');
+        if (!hash) {
+            showSection('summary');
+            return;
+        }
+
+        if (sections.indexOf(hash) !== -1) {
+            showSection(hash);
+        } else if (subSectionMap[hash]) {
+            showSection(subSectionMap[hash], hash);
+        } else {
+            showSection('summary');
+        }
+    }
+
+    // Wire up sub-item clicks with data-scroll
+    document.querySelectorAll('.sidebar-nav a[data-scroll]').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            var section = this.getAttribute('data-section');
+            var scrollTo = this.getAttribute('data-scroll');
+            showSection(section, scrollTo);
+        });
+    });
+
+    // Handle hash changes
+    window.addEventListener('hashchange', handleHash);
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', handleHash);
+
+    // Close sidebar when clicking outside on mobile
+    document.getElementById('content-area').addEventListener('click', function() {
+        if (window.innerWidth <= 900) {
+            document.getElementById('sidebar').classList.remove('open');
+        }
+    });
+</script>
+
+</body>
+</html>
